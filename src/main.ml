@@ -20,16 +20,20 @@ let init () =
 	display     := Sdlvideo.set_video_mode wmax hmax [`DOUBLEBUF]
 
 let show r1 r2 = 
-	Sdlvideo.blit_surface !spritesheet (~src_rect:r1) !display (~dst_rect:r2) ();
+	let d = Sdlvideo.display_format !spritesheet in
+	Sdlvideo.blit_surface ~src:d 
+		~src_rect:r1 ~dst:!display 
+		~dst_rect:r2  ();
 	Sdlvideo.flip !display
 	
 
 let update  () = ()
 let draw    () =
-	let r1 = Sdlvideo.rect 0 0 144 255 in
-	let r2 = Sdlvideo.rect 0 0 144 255 in
-	show r1 r2
-
+	for i = 0 to (800 / 144) do
+		let r1 = Sdlvideo.rect 0 0 144 255 in
+		let r2 = Sdlvideo.rect (i * 144) 0 144 255 in
+		show r1 r2
+	done
 
 
 let _ = 
