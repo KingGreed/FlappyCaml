@@ -2,6 +2,7 @@
 let wmax = 800 
 let hmax = 255
 let pos  = ref (0, 0)
+let state = ref 0
 
 let spritesheet = ref (Obj.magic 0)
 let display     = ref (Obj.magic 0)
@@ -33,7 +34,18 @@ let draw    () =
 		let r1 = Sdlvideo.rect 0 0 144 255 in
 		let r2 = Sdlvideo.rect (i * 144) 0 144 255 in
 		show r1 r2
-	done
+	done;
+	let x = ref 0 in 
+	let y = ref 0 in
+	match !state with
+		| 0 -> ( x := 223; y := 124; )
+		| 1 -> ( x := 264; y := 64;  )
+		| 2 -> ( x := 264; y := 90;  )
+	;
+	let r1 = Sdlvideo.rect !x !y 17 12 in
+	let r2 = Sdlvideo.rect 50 50 17 12 in
+	
+	show r1 r2
 
 
 let _ = 
