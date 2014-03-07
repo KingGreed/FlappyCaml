@@ -5,15 +5,21 @@ let pos  = ref (0, 0)
 let state = ref 0
 let t = ref 0.
 
+let progress = ref 0		(*avancement*)	
+let pipes = Queue.create()
+let nb_pipe = 10
+let space_pipe = 200
+let next_x_pipe = ref 500
+
 let foi = float_of_int
 let iof = int_of_float
-
 
 
 let spritesheet = ref (Obj.magic 0)
 let display     = ref (Obj.magic 0)
 
-let getX pos = match !pos with (x, _) -> x
+let getX pos = match pos with (x, _) -> x
+let getY pos = match pos with (_, y) -> y
 
 let sdl_init () =
     begin
@@ -21,11 +27,19 @@ let sdl_init () =
         Sdlevent.enable_events Sdlevent.all_events_mask;
     end
 
+let gen_pipe() =
+	Queue.push (!next_x_pipe, Random.int 400 + 200) pipes;
+	next_x_pipe := !next_x_pipe + space_pipe
+
 let init () =
+	Random.self_init();
     sdl_init ();
 
     spritesheet := Sdlloader.load_image "assets/spritesheet.png";
-	display     := Sdlvideo.set_video_mode wmax hmax [`DOUBLEBUF]
+	display     := Sdlvideo.set_video_mode wmax hmax [`DOUBLEBUF];
+	for i = 0 to nb_pipe do
+		gen_pipe()
+	done
 
 let show r1 r2 = 
 	let d = Sdlvideo.display_format ~alpha:true !spritesheet in
@@ -37,7 +51,13 @@ let show r1 r2 =
 let update  () =  let (x, y) = !pos in 
     pos := (x+1, iof(sin(!t) *. 100. +. 100.));
     t := !t +. 0.05;
-    state := (!state + 1) mod 3
+    state := (!state + 1) mod 3;
+	if (getX (Queue.peek pipes) - !progress < -50) then
+		ignore (Queue.pop pipes); 
+	if (Queue.length pipes < nb_pipe) then
+		gen_pipe();
+	incr progress
+	
 
 
 let draw    () =
