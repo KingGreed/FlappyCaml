@@ -5,10 +5,17 @@ let pos  = ref (0, 0)
 let state = ref 0
 let t = ref 0.
 
+
 let foi = float_of_int
 let iof = int_of_float
 
+let upPipeSrc    = (302, 134)
+let downPipeSrc  = (330, 0)
+let pipeWidth = 26
 
+let offset = ref 1 (* Size in pixel to first pipe *)
+let spaceBetweenPipe = 40
+let progress = ref 0
 
 let spritesheet = ref (Obj.magic 0)
 let display     = ref (Obj.magic 0)
@@ -39,6 +46,7 @@ let update  () =  let (x, y) = !pos in
     t := !t +. 0.05;
     state := (!state + 1) mod 3
 
+let pipes = [5]
 
 let draw    () =
     (* background display *)
@@ -50,6 +58,22 @@ let draw    () =
         show r1 r2
     done;
 
+    List.iter (fun upHeight -> 
+        let downHeight = hmax - upHeight - spaceBetweenPipe in
+        let posX = !offset + spaceBetweenPipe * !progress   in 
+
+        let (x, y) = upPipeSrc in
+        let r1 = Sdlvideo.rect x y pipeWidth (-upHeight)    in
+        let r2 = Sdlvideo.rect posX 0 pipeWidth upHeight    in
+        show r1 r2;
+
+        let (x, y) = downPipeSrc in
+        let r1 = Sdlvideo.rect x y    pipeWidth downHeight  in
+        let r2 = Sdlvideo.rect posX 0 pipeWidth downHeight  in
+        show r1 r2
+
+    ) pipes;
+
     let x = ref 223 in 
     let y = ref 124 in
 
@@ -59,14 +83,19 @@ let draw    () =
     else                      ( x := 264; y := 64;  );
 
 
-    let r1 = Sdlvideo.rect !x   !y 17 17 in
-	let r2 = Sdlvideo.rect 20 posY  17 17 in
+    let camelXdimensions = 17 in
+    let camelYdimensions = 17 in
+    let pX   = 20 in
+
+    let r1 = Sdlvideo.rect !x   !y camelXdimensions camelYdimensions in
+	let r2 = Sdlvideo.rect pX posY camelXdimensions camelYdimensions in
 	show r1 r2;
 
     Sdlvideo.flip !display
 
+let running = ref true
+
 let _ = 
-    let running = ref true in
     let time    = ref 0    in
     init();
     while !running do
