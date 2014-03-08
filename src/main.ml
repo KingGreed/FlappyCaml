@@ -17,11 +17,12 @@ let nb_pipe     = 10 (* should be a function of screen width *)
 let next_x_pipe = ref 500
 
 let offset = ref 1 (* Size in pixel to first pipe *)
-let spaceBetweenPipe = 40
+let spaceYBetweenPipe = 40
+let spaceXBetweenPipe = 80
 let progress = ref 0
 
 let pipes = Queue.create()
-let pipesArray = [50]
+let pipesArray = [50; 60; 140]
 
 
 let spritesheet = ref (Obj.magic 0)
@@ -33,7 +34,7 @@ let getY pos = match pos with (_, y) -> y
 (* Init *)
 let gen_pipe() =
     Queue.push (!next_x_pipe, Random.int 400 + 200) pipes;
-    next_x_pipe := !next_x_pipe + spaceBetweenPipe
+    next_x_pipe := !next_x_pipe + spaceXBetweenPipe
 
 let sdl_init () =
     begin
@@ -80,14 +81,16 @@ let draw    () =
         show r1 r2
     done;
 
+    let no = ref 0 in
     List.iter (fun h -> 
-        let posX       = !offset + spaceBetweenPipe * !progress in
+        let posX       = !offset + spaceXBetweenPipe * !no in
+        incr no;
 
 
         (* Pipe Head *)
         let (srcX, srcY, srcW, srcH)    = pipeHeadSrc       in
         let (dstX, dstYTop, dstYBottom) = (posX, h - srcH, 
-                h + spaceBetweenPipe)                       in
+                h + spaceYBetweenPipe)                      in
         let r1 = Sdlvideo.rect srcX srcY srcW srcH          in
         let r2 = Sdlvideo.rect dstX dstYTop srcW srcH       in
         let r3 = Sdlvideo.rect dstX dstYBottom srcW srcH    in
@@ -98,14 +101,14 @@ let draw    () =
         (* Pipe corpse *)
         let headHeight               = srcH                              in
         let topCorpseHeight          = h - headHeight                    in
-        let botomCorpseHeight        = hmax - spaceBetweenPipe - h       in
+        let botomCorpseHeight        = hmax - spaceYBetweenPipe - h      in
         let dstX                     = posX + 1                          in
         let (srcX, srcY, srcW, srcH) = pipeCorpseSrc                     in
         let r1                       = Sdlvideo.rect srcX srcY srcW srcH in
 
         (* Top corpse *)
         let chDivSrcH = topCorpseHeight / srcH               in
-        for i = 1 to chDivSrcH do
+        for i = 0 to chDivSrcH - 1 do
             let dstYTop = 0 + i * srcH                       in 
             let r2 = Sdlvideo.rect dstX dstYTop srcW srcH   in
             show r1 r2
@@ -117,17 +120,15 @@ let draw    () =
             let r2 = Sdlvideo.rect dstX dstYTop srcW srcH    in
             show r1 r2
         );
+
         (* Bottom corpse *)
         let chDivSrcH = botomCorpseHeight / srcH           in
-        let dstY = h + spaceBetweenPipe + headHeight       in
+        let dstY = h + spaceYBetweenPipe + headHeight      in
         for i = 0 to chDivSrcH + 1 do
             let dstYBot = dstY + i * srcH                  in 
             let r2 = Sdlvideo.rect dstX dstYBot srcW srcH  in
             show r1 r2
         done;
-        
-
-
 
     ) pipesArray;
 
@@ -148,7 +149,7 @@ let draw    () =
 	let r2 = Sdlvideo.rect pX posY camelXdimensions camelYdimensions in
 	show r1 r2;
 
-    Sdlvideo.flip !display
+    if(!state <> 2) then Sdlvideo.flip !display
 
 let running = ref true
 
