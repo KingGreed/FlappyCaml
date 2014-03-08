@@ -1,26 +1,39 @@
-
 let wmax = 800 
 let hmax = 240
 let pos  = ref (0, 0)
 let state = ref 0
 let t = ref 0.
 
-
 let foi = float_of_int
 let iof = int_of_float
 
-let upPipeSrc    = (302, 134)
-let downPipeSrc  = (330, 0)
-let pipeWidth = 26
+
+let pipeHeadSrc   = (302, 123, 26, 12) (* x, y, w, h *)
+let pipeCorpseSrc = (303, 0, 23, 122)  (* x, y, w, h *) 
+
+let downPipeSrc = (330, 0)
+let pipeWidth   = 26
+let nb_pipe     = 10 (* should be a function of screen width *)
+let next_x_pipe = ref 500
 
 let offset = ref 1 (* Size in pixel to first pipe *)
 let spaceBetweenPipe = 40
 let progress = ref 0
 
+let pipes = Queue.create()
+let pipesArray = [50]
+
+
 let spritesheet = ref (Obj.magic 0)
 let display     = ref (Obj.magic 0)
 
-let getX pos = match !pos with (x, _) -> x
+let getX pos = match pos with (x, _) -> x
+let getY pos = match pos with (_, y) -> y
+
+(* Init *)
+let gen_pipe() =
+    Queue.push (!next_x_pipe, Random.int 400 + 200) pipes;
+    next_x_pipe := !next_x_pipe + spaceBetweenPipe
 
 let sdl_init () =
     begin
@@ -29,24 +42,33 @@ let sdl_init () =
     end
 
 let init () =
+    Random.self_init();
     sdl_init ();
 
     spritesheet := Sdlloader.load_image "assets/spritesheet.png";
-	display     := Sdlvideo.set_video_mode wmax hmax [`DOUBLEBUF]
+	display     := Sdlvideo.set_video_mode wmax hmax [`DOUBLEBUF];
+    for i = 0 to nb_pipe do
+        gen_pipe()
+    done
 
+    
+(* Update *)
+let update  () =  let (x, y) = !pos in 
+    pos := (x+1, iof(sin(!t) *. 100. +. 100.));
+    t := !t +. 0.05;
+    state := (!state + 1) mod 3;
+    if (getX (Queue.peek pipes) - (x+1) < -50) then
+        ignore (Queue.pop pipes); 
+    if (Queue.length pipes < nb_pipe) then
+        gen_pipe()
+
+
+(* Draw *)
 let show r1 r2 = 
 	let d = Sdlvideo.display_format ~alpha:true !spritesheet in
 	Sdlvideo.blit_surface ~src:d 
 		~src_rect:r1 ~dst:!display 
 		~dst_rect:r2  ()
-	
-
-let update  () =  let (x, y) = !pos in 
-    pos := (x+1, iof(sin(!t) *. 100. +. 100.));
-    t := !t +. 0.05;
-    state := (!state + 1) mod 3
-
-let pipes = [5]
 
 let draw    () =
     (* background display *)
@@ -58,21 +80,56 @@ let draw    () =
         show r1 r2
     done;
 
-    List.iter (fun upHeight -> 
-        let downHeight = hmax - upHeight - spaceBetweenPipe in
-        let posX = !offset + spaceBetweenPipe * !progress   in 
+    List.iter (fun h -> 
+        let posX       = !offset + spaceBetweenPipe * !progress in
 
-        let (x, y) = upPipeSrc in
-        let r1 = Sdlvideo.rect x y pipeWidth (-upHeight)    in
-        let r2 = Sdlvideo.rect posX 0 pipeWidth upHeight    in
-        show r1 r2;
 
-        let (x, y) = downPipeSrc in
-        let r1 = Sdlvideo.rect x y    pipeWidth downHeight  in
-        let r2 = Sdlvideo.rect posX 0 pipeWidth downHeight  in
-        show r1 r2
+        (* Pipe Head *)
+        let (srcX, srcY, srcW, srcH)    = pipeHeadSrc       in
+        let (dstX, dstYTop, dstYBottom) = (posX, h - srcH, 
+                h + spaceBetweenPipe)                       in
+        let r1 = Sdlvideo.rect srcX srcY srcW srcH          in
+        let r2 = Sdlvideo.rect dstX dstYTop srcW srcH       in
+        let r3 = Sdlvideo.rect dstX dstYBottom srcW srcH    in
+        show r1 r2; (* Top    pipe head *)
+        show r1 r3; (* Bottom pipe head *)
 
-    ) pipes;
+
+        (* Pipe corpse *)
+        let headHeight               = srcH                              in
+        let topCorpseHeight          = h - headHeight                    in
+        let botomCorpseHeight        = hmax - spaceBetweenPipe - h       in
+        let dstX                     = posX + 1                          in
+        let (srcX, srcY, srcW, srcH) = pipeCorpseSrc                     in
+        let r1                       = Sdlvideo.rect srcX srcY srcW srcH in
+
+        (* Top corpse *)
+        let chDivSrcH = topCorpseHeight / srcH               in
+        for i = 1 to chDivSrcH do
+            let dstYTop = 0 + i * srcH                       in 
+            let r2 = Sdlvideo.rect dstX dstYTop srcW srcH   in
+            show r1 r2
+        done;
+        if topCorpseHeight mod srcH <> 0 then (
+            let dstYTop = 0 + chDivSrcH * srcH               in
+            let srcH    = topCorpseHeight - chDivSrcH * srcH in
+            let r1 = Sdlvideo.rect srcX srcY srcW srcH       in
+            let r2 = Sdlvideo.rect dstX dstYTop srcW srcH    in
+            show r1 r2
+        );
+        (* Bottom corpse *)
+        let chDivSrcH = botomCorpseHeight / srcH           in
+        let dstY = h + spaceBetweenPipe + headHeight       in
+        for i = 0 to chDivSrcH + 1 do
+            let dstYBot = dstY + i * srcH                  in 
+            let r2 = Sdlvideo.rect dstX dstYBot srcW srcH  in
+            show r1 r2
+        done;
+        
+
+
+
+    ) pipesArray;
 
     let x = ref 223 in 
     let y = ref 124 in
