@@ -18,6 +18,7 @@ type vector2d = {
 
 type gamestate = {
     mutable pos : vector2d;
+    mutable yvelocity : float;
     mutable next_pipe : int;
     mutable alive : bool;
     mutable frame : int;
@@ -26,12 +27,17 @@ type gamestate = {
 let state = {
     pos = { x = 0; y = 0};
     (*box = { x = 0; y = 0; w = 17; h = 17};*)
+    yvelocity = 0.;
     next_pipe = 0;
     alive = false;
     frame = 0;
 }
 
 let screen = { x = 280; y = 240 }
+
+(* Physics *)
+let g = 10.0
+let step = 0.09
 
 (* Graphics constants *)
 let spritesheet = ref (Obj.magic 0)
@@ -86,6 +92,7 @@ let cycle_pipes () =
 
 let new_game () =
     state.pos       <- { x = 0; y = 0};
+    state.yvelocity <- 0.;
     state.next_pipe <- offset;
     state.alive     <- true;
     state.frame     <- 0;
@@ -119,11 +126,14 @@ let update_box () =
     state.box.x <- state.pos.x;
     state.box.y <- state.pos.y*)
 
+let jump () = state.yvelocity <- -20.
+
 let update  () =
+    if state.pos.y > 100 then jump ();
     state.frame <- (state.frame + 1) mod 3;
+    state.yvelocity <- g *. step +. state.yvelocity;
+    state.pos.y <- (int) (step *. (2. *. state.yvelocity +. g *. step)) + state.pos.y;
     state.pos.x <- state.pos.x + 1;
-    state.pos.y <- (int) (sin(!t) *. 100. +. 100.);
-    t := !t +. 0.05;
     (*update_box ();
     let (b_up, b_down) = get_bs_from_p (Queue.peek pipes) in
     if intersect state.box b_up || intersect state.box b_down then gamestate.alive <- false;*)
@@ -163,7 +173,7 @@ let draw () =
 let running = ref true
 
 let _ =
-    let time    = ref 0    in
+    let time = ref 0 in
     init();
     while !running do
         time := Sdltimer.get_ticks ();
@@ -172,7 +182,7 @@ let _ =
         draw();
         time := Sdltimer.get_ticks () - !time;
         time := 1000 / 60 - !time;
-        if(!time > 0) then (
+        if !time > 0 then (
             Sdltimer.delay (!time)
         )
     done
