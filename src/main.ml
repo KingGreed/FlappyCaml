@@ -49,7 +49,25 @@ let padding = { x = 85; y = 40 }
 
 let pipes = Queue.create()
 
+(* Events *)
+
+let keybinds = Hashtbl.create 10
+let bind_key = Hashtbl.add keybinds
+let unbind_key = Hashtbl.remove keybinds
+let call_key_handler k = Hashtbl.find keybinds k ()
+
+let pump () = Sdlevent.(match poll () with
+    | None   -> ()
+    | Some e -> (
+        match e with
+            | KEYDOWN ke -> call_key_handler ke.keysym
+            | _ -> ()
+    )
+)
+
 (* Init *)
+let exit () = exit 0
+
 let push_pipe () = Sdlvideo.(
     let min_y = screen.y - padding.y / 2 - lower_pipe.r_h in
     let range_y = upper_pipe.r_h + padding.y / 2 - min_y in
@@ -75,12 +93,17 @@ let new_game () =
         push_pipe()
     done
 
+let jump () = state.yvelocity <- -20.
+
 let init () =
     Random.self_init();
     Sdl.init [`EVERYTHING];
     Sdlevent.enable_events Sdlevent.all_events_mask;
     spritesheet := Sdlloader.load_image "assets/spritesheet.png";
     display     := Sdlvideo.set_video_mode screen.x screen.y [`DOUBLEBUF];
+
+    bind_key Sdlkey.KEY_ESCAPE exit;
+    bind_key Sdlkey.KEY_SPACE jump;
 
     new_game()
 
@@ -89,7 +112,7 @@ let pipe_out p = p + upper_pipe.Sdlvideo.r_w - state.pos.x < 0
 
 (*let get_bs_from_p p = ({ x = p.x - state.pos.x, y = 0, w = 26, h = p.y },
                        { x = p.x - state.pos.x, y = p.y, w = 26, h = screen.y - p.y})
-        
+
 let intersect b1 b2 = b1.x + b1.w < b2.x || b1.y + b1.h < b2.y || b2.y + b2.h < b1.y
 
 let update_box () =
@@ -144,6 +167,7 @@ let _ =
     init();
     while !running do
         time := Sdltimer.get_ticks ();
+        pump();
         update();
         draw();
         time := Sdltimer.get_ticks () - !time;
