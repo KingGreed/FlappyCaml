@@ -60,7 +60,7 @@ let pipes = Queue.create()
 let keybinds = Hashtbl.create 10
 let bind_key = Hashtbl.add keybinds
 let unbind_key = Hashtbl.remove keybinds
-let call_key_handler k = Hashtbl.find keybinds k ()
+let call_key_handler k = Hashtbl.(if mem keybinds k then find keybinds k ())
 
 let pump () = Sdlevent.(match poll () with
     | None   -> ()
@@ -129,7 +129,6 @@ let update_box () =
 let jump () = state.yvelocity <- -20.
 
 let update  () =
-    if state.pos.y > 100 then jump ();
     state.frame <- (state.frame + 1) mod 3;
     state.yvelocity <- g *. step +. state.yvelocity;
     state.pos.y <- (int) (step *. (2. *. state.yvelocity +. g *. step)) + state.pos.y;
