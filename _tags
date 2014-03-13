@@ -1,3 +1,0 @@
-<**/*.{byte,native}>: package(sdl), package(sdl.sdlimage)
-<**/*.ml>: package(sdl), package(sdl.sdlimage)
-<**/*.mli>: package(sdl), package(sdl.sdlimage)

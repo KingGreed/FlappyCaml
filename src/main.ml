@@ -1,3 +1,6 @@
+external network_init : unit -> unit = "network_init"
+external network_send_state : 'a -> unit = "send_state"
+
 let int = int_of_float
 
 let tau = 8. *. atan 1.
@@ -118,7 +121,28 @@ let init () =
     bind_key Sdlkey.KEY_SPACE jump;
     bind_key Sdlkey.KEY_p toggle_autoplay;
 
+    network_init ();
+
     new_game()
+
+(* Mechanics *)
+
+let jump () = if abs_float state.yvelocity > 0.1 then state.yvelocity <- -20.
+
+let jumpp p = let xcamel = state.pos.x + camel_margin and ylower = p.y + padding.y in if xcamel < p.x - 40 then (if state.pos.y >= ylower + 10 then jump (); ) else (if state.pos.y >= ylower - 20 then jump (); )
+
+let get_second_pipe () =
+    let elem = ref { x = 0; y = 0 } in
+    let i = ref 0 in
+    (try (
+        Queue.iter (fun e ->
+            if !i = 1 then (elem := e; raise (Failure ""));
+            incr i
+        ) pipes
+    ) with _ -> ());
+    !elem
+
+let network_send_states () = let next_pipe = Queue.peek pipes in if state.pos.x + camel_margin < next_pipe.x + upper_pipe.Sdlvideo.r_w then jumpp next_pipe else jumpp (get_second_pipe ())
 
 (* Update *)
 let pipe_out p = p + upper_pipe.Sdlvideo.r_w - state.pos.x < 0
@@ -141,40 +165,13 @@ let get_pipe_hitboxes p = Sdlvideo.(
 let collides_with_pipe p = let (upper,lower) = get_pipe_hitboxes p in
     collides_with upper || collides_with lower
 
-(*let jump () = state.yvelocity <- -20.*)
-let jump () = if abs_float state.yvelocity > 0.1 then state.yvelocity <- -20.
 
 let bird_out () = state.pos.y + camel.Sdlvideo.r_w < 0 || state.pos.y > screen.y
-
-let get_second_pipe () =
-    let elem = ref { x = 0; y = 0 } in
-    let i = ref 0 in
-    (try (
-        Queue.iter (fun e ->
-            if !i = 1 then (elem := e; raise (Failure ""));
-            incr i
-        ) pipes
-    ) with _ -> ());
-    !elem
-
-let jump_pipe p =
-    let xcamel = state.pos.x + camel_margin in
-    let ylower = p.y + padding.y in
-    if xcamel < p.x - 40 then (
-        if state.pos.y >= ylower + 10 then jump ();
-    ) else (
-        if state.pos.y >= ylower - 20 then jump ();
-    )
 
 let update  () =
     let next_pipe = Queue.peek pipes in
 
-    if !autoplay then (
-        if state.pos.x + camel_margin < next_pipe.x + upper_pipe.Sdlvideo.r_w then
-            jump_pipe next_pipe
-        else
-            jump_pipe (get_second_pipe ())
-    );
+    if !autoplay then network_send_states ();
 
     state.frame <- (state.frame + 1) mod 3;
     state.yvelocity <- g *. step +. state.yvelocity;

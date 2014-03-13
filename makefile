@@ -6,20 +6,26 @@ ARTIFACT=$(TARGET_DIR)$(NAME)-$(VERSION)
 
 DIR=src/
 
-OCAML=ocamlbuild
-OCOPT=-use-ocamlfind -r -quiet -verbose -1 -build-dir $(TARGET_DIR)build -install-bin-dir $(TARGET_DIR)
+CC=clang
+CFLAGS= -std=c99 -O2 -I`ocamlc -where` -lnjgr
+OFLAGS= -I +sdl -I +site-lib/sdl
+OCAMLLD= bigarray.cmxa sdl.cmxa sdlloader.cmxa
 
-.PHONY:
-all: main
+main: clean init $(DIR)main.ml $(DIR)network.o
+	ocamlopt.opt $(OFLAGS) $(OCAMLLD) -o $(ARTIFACT) $(DIR)network.o $(DIR)main.ml
 
-main:: clean
-	$(OCAML) $(OCOPT) $(DIR)main.native
-	cp -f $(TARGET_DIR)build/$(DIR)main.native $(TARGET_DIR)
+init:
+	mkdir target
 
-debug:: clean
-	$(OCAML) $(OCOPT) -tag debug $(DIR)main.byte
-	cp -f $(TARGET_DIR)build/$(DIR)main.byte $(TARGET_DIR)
-	ocamldebug $(TARGET_DIR)main.byte
+.SUFFIXES: .ml .cmx
 
-clean:
-	$(OCAML) $(OCOPT) -clean
+.ml.cmx:
+	ocamlopt.opt $(OFLAGS) $(OCAMLLD) -c $<
+
+.o:
+	$(CC) $(CFLAGS) $<
+
+clean::
+	rm -f *~ *.o *.cm[iox]
+	rm -Rf $(TARGET_DIR)
+
