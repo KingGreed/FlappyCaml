@@ -120,7 +120,7 @@ let pipe_out p = p + upper_pipe.Sdlvideo.r_w - state.pos.x < 0
 (*let get_bs_from_p p = ({ x = p.x - state.pos.x, y = 0, w = 26, h = p.y },
                        { x = p.x - state.pos.x, y = p.y, w = 26, h = screen.y - p.y})
 
-let intersect b1 b2 = b1.x + b1.w < b2.x || b1.y + b1.h < b2.y || b2.y + b2.h < b1.y
+let intersect b1 b2 = not (b1.x + b1.w < b2.x || b1.y + b1.h < b2.y || b2.y + b2.h < b1.y || b2.x + b2.w < b1.x)
 
 let update_box () =
     state.box.x <- state.pos.x;
