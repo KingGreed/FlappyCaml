@@ -1,5 +1,3 @@
-let t = ref 0.
-
 let int = int_of_float
 
 let tau = 8. *. atan 1.
@@ -9,12 +7,12 @@ type vector2d = {
     mutable y : int;
 }
 
-(*type box2d = {
-    mutable x : int;
-    mutable y : int;
-    mutable w : int;
-    mutable h : int;
-}*)
+type box2d = {
+    mutable bx : int;
+    mutable by : int;
+    mutable bw : int;
+    mutable bh : int;
+}
 
 type gamestate = {
     mutable pos : vector2d;
@@ -26,18 +24,20 @@ type gamestate = {
 
 let state = {
     pos = { x = 0; y = 0};
-    (*box = { x = 0; y = 0; w = 17; h = 17};*)
     yvelocity = 0.;
     next_pipe = 0;
     alive = false;
     frame = 0;
 }
 
-let screen = { x = 280; y = 240 }
+let screen = { x = 1200; y = 240 }
 
 (* Physics *)
-let g = 10.0
-let step = 0.09
+let g = 12.0
+let step = 0.1
+
+(* autoplay *)
+let autoplay = ref false
 
 (* Graphics constants *)
 let spritesheet = ref (Obj.magic 0)
@@ -46,14 +46,15 @@ let display     = ref (Obj.magic 0)
 let background = Sdlvideo.rect   0   0 144 255
 let upper_pipe = Sdlvideo.rect 302   0  26 135
 let lower_pipe = Sdlvideo.rect 330   0  26 129
-let camel      = Sdlvideo.rect 223 124  17  17
+let camel      = Sdlvideo.rect 223 124  17  14
 
-let nb_pipe = 3
+let nb_pipe = 20
 
-let offset = 100 (* Size in pixel to first pipe *)
+let camel_margin = 50
+let offset = 300 (* Size in pixel to first pipe *)
 let padding = { x = 85; y = 40 }
 
-let pipes = Queue.create()
+let pipes = Queue.create ()
 
 (* Events *)
 
@@ -91,58 +92,103 @@ let cycle_pipes () =
     push_pipe()
 
 let new_game () =
-    state.pos       <- { x = 0; y = 0};
+    state.pos       <- { x = 0; y = screen.y / 2};
     state.yvelocity <- 0.;
     state.next_pipe <- offset;
     state.alive     <- true;
     state.frame     <- 0;
+    Queue.clear pipes;
     for i = 0 to nb_pipe do
         push_pipe()
     done
 
 let jump () = state.yvelocity <- -20.
 
+let toggle_autoplay () = autoplay := not !autoplay
+
 let init () =
     Random.self_init();
     Sdl.init [`EVERYTHING];
     Sdlevent.enable_events Sdlevent.all_events_mask;
-    spritesheet := Sdlloader.load_image "assets/spritesheet.png";
     display     := Sdlvideo.set_video_mode screen.x screen.y [`DOUBLEBUF];
+    spritesheet := Sdlloader.load_image "assets/spritesheet.png";
+    spritesheet := Sdlvideo.display_format ~alpha:true !spritesheet;
 
     bind_key Sdlkey.KEY_ESCAPE exit;
     bind_key Sdlkey.KEY_SPACE jump;
+    bind_key Sdlkey.KEY_p toggle_autoplay;
 
     new_game()
 
 (* Update *)
 let pipe_out p = p + upper_pipe.Sdlvideo.r_w - state.pos.x < 0
 
-(*let get_bs_from_p p = ({ x = p.x - state.pos.x, y = 0, w = 26, h = p.y },
-                       { x = p.x - state.pos.x, y = p.y, w = 26, h = screen.y - p.y})
+let collides_with box = Sdlvideo.(
+       state.pos.x + camel_margin < box.bx + box.bw
+    && state.pos.y < box.by + box.bh
+    && box.bx < state.pos.x + camel_margin + camel.r_w
+    && box.by < state.pos.y + camel.r_h
+)
 
-let intersect b1 b2 = not (b1.x + b1.w < b2.x || b1.y + b1.h < b2.y || b2.y + b2.h < b1.y || b2.x + b2.w < b1.x)
+let get_pipe_hitboxes p = Sdlvideo.(
+    let upper_y = p.y - upper_pipe.r_h - padding.y in
+    let lower_y = p.y + padding.y in (
+        { bx = p.x; by = upper_y; bw = upper_pipe.r_w; bh = upper_pipe.r_h },
+        { bx = p.x; by = lower_y; bw = lower_pipe.r_w; bh = lower_pipe.r_h }
+    )
+)
 
-let update_box () =
-    state.box.x <- state.pos.x;
-    state.box.y <- state.pos.y*)
+let collides_with_pipe p = let (upper,lower) = get_pipe_hitboxes p in
+    collides_with upper || collides_with lower
 
-let jump () = state.yvelocity <- -20.
+(*let jump () = state.yvelocity <- -20.*)
+let jump () = if abs_float state.yvelocity > 0.1 then state.yvelocity <- -20.
+
+let bird_out () = state.pos.y + camel.Sdlvideo.r_w < 0 || state.pos.y > screen.y
+
+let get_second_pipe () =
+    let elem = ref { x = 0; y = 0 } in
+    let i = ref 0 in
+    (try (
+        Queue.iter (fun e ->
+            if !i = 1 then (elem := e; raise (Failure ""));
+            incr i
+        ) pipes
+    ) with _ -> ());
+    !elem
+
+let jump_pipe p =
+    let xcamel = state.pos.x + camel_margin in
+    let ylower = p.y + padding.y in
+    if xcamel < p.x - 40 then (
+        if state.pos.y >= ylower + 10 then jump ();
+    ) else (
+        if state.pos.y >= ylower - 20 then jump ();
+    )
 
 let update  () =
+    let next_pipe = Queue.peek pipes in
+
+    if !autoplay then (
+        if state.pos.x + camel_margin < next_pipe.x + upper_pipe.Sdlvideo.r_w then
+            jump_pipe next_pipe
+        else
+            jump_pipe (get_second_pipe ())
+    );
+
     state.frame <- (state.frame + 1) mod 3;
     state.yvelocity <- g *. step +. state.yvelocity;
     state.pos.y <- (int) (step *. (2. *. state.yvelocity +. g *. step)) + state.pos.y;
-    state.pos.x <- state.pos.x + 1;
-    (*update_box ();
-    let (b_up, b_down) = get_bs_from_p (Queue.peek pipes) in
-    if intersect state.box b_up || intersect state.box b_down then gamestate.alive <- false;*)
-    if pipe_out (Queue.peek pipes).x then cycle_pipes ()
+    state.pos.x <- state.pos.x + 2;
+    if collides_with_pipe next_pipe || bird_out () then state.alive <- false;
+    if pipe_out next_pipe.x then cycle_pipes ();
+
+    if not state.alive then new_game ()
 
 (* Draw *)
 let show r1 r2 =
-    let d = Sdlvideo.display_format ~alpha:true !spritesheet in
     Sdlvideo.blit_surface
-        ~src:d
+        ~src:!spritesheet
         ~src_rect:r1
         ~dst:!display
         ~dst_rect:r2
@@ -165,7 +211,7 @@ let draw () =
         showat lower_pipe (x, lower_y);
     ) pipes;
 
-    showat camel (20, state.pos.y);
+    showat camel (camel_margin, state.pos.y);
 
     Sdlvideo.flip !display
 
@@ -174,6 +220,7 @@ let running = ref true
 let _ =
     let time = ref 0 in
     init();
+    Sdltimer.delay 10;
     while !running do
         time := Sdltimer.get_ticks ();
         pump();
